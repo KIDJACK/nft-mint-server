@@ -1,34 +1,24 @@
 import express from "express";
-import dotenv from "dotenv";
-import cors from "cors";
-import { exec } from "child_process";
-
-dotenv.config();
+import { mintNFT } from "./mint-nft.mjs";
+import { waitFor2AdaFrom } from "./utils/waitForPayment.mjs";
 
 const app = express();
-app.use(cors());
 app.use(express.json());
 
 app.post("/mint", async (req, res) => {
   const address = req.body.address;
-  if (!address) {
-    return res.status(400).send("address is required");
-  }
-
   console.log("Received mint request for:", address);
 
-  // mint-nft.mjs を CLI 経由で呼び出す
-  const cmd = `node mint-nft.mjs ${address}`;
-  exec(cmd, (error, stdout, stderr) => {
-    if (error) {
-      console.error("Mint error:", error);
-      return res.status(500).send(stderr || "Error minting NFT");
-    }
-    return res.send(stdout);
-  });
+  try {
+    await waitFor2AdaFrom(address); // ← ここで2ADAの支払い確認
+    const txHash = await mintNFT(address);
+    res.status(200).send(txHash);
+  } catch (err) {
+    console.error("Mint failed:", err.message);
+    res.status(500).send(err.message);
+  }
 });
 
-const port = process.env.PORT || 3000;
-app.listen(port, () => {
-  console.log(`NFT mint server running on port ${port}`);
+app.listen(3000, () => {
+  console.log("Server listening on port 3000");
 });
