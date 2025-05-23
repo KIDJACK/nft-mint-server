@@ -1,70 +1,51 @@
-// nft-mint.mjs
-
 import { Lucid, Blockfrost } from "lucid-cardano";
-import dotenv from "dotenv";
-dotenv.config();
+import { config } from "dotenv";
 
-// コマンドライン引数から宛先アドレスを取得
-const toAddress = process.argv[2];
-if (!toAddress) {
-  console.error("宛先アドレスを指定してください");
-  process.exit(1);
-}
+config();
 
-// Lucid初期化（Blockfrost使用）
-const lucid = await Lucid.new(
-  new Blockfrost(
-    "https://cardano-preprod.blockfrost.io/api/v0",
-    process.env.BLOCKFROST_API_KEY
-  ),
-  "Preprod"
-);
+export async function mintNFT(toAddress) {
+  const lucid = await Lucid.new(
+    new Blockfrost(
+      "https://cardano-preprod.blockfrost.io/api/v0",
+      process.env.BLOCKFROST_API_KEY
+    ),
+    process.env.NETWORK
+  );
 
-// 秘密鍵（.envから読み込み）
-const privateKey = process.env.PRIVATE_KEY;
-if (!privateKey) {
-  console.error("PRIVATE_KEY が .env に設定されていません");
-  process.exit(1);
-}
-lucid.selectWalletFromPrivateKey(privateKey);
+  lucid.selectWalletFromPrivateKey(process.env.PRIVATE_KEY);
 
-// ミントポリシー（事前に一致するKeyHashを使う）
-const policy = lucid.utils.nativeScriptFromJson({
-  type: "sig",
-  keyHash: process.env.KEY_HASH,
-});
-const policyId = lucid.utils.mintingPolicyToId(policy);
+  const policy = lucid.utils.nativeScriptFromJson({
+    keyHash: process.env.KEY_HASH,
+    type: "sig",
+  });
 
-// アセット名とユニット（Hex明示）
-const assetName = "DelegatersNFT";
-const assetNameHex = "44656c656761746572734e4654"; // Hexで指定
-const unit = policyId + assetNameHex;
+  const policyId = lucid.utils.mintingPolicyToId(policy);
+  const assetName = "Delegater's NFT";
+  const assetNameHex = Buffer.from(assetName, "utf8").toString("hex");
+  const unit = policyId + assetNameHex;
 
-// CIP-25 v1 メタデータ
-const metadata = {
-  "721": {
+  const metadata = {
     [policyId]: {
       [assetName]: {
-        name: "Delegater's NFT",
-        image: process.env.NFT_IMAGE_URL,
+        name: assetName,
+        image: "ipfs://Qmbb11GKDcBUXQxd8yhtnPnYJm178Lp9J5rSC9jjsxxQ4n",
         mediaType: "image/jpeg",
-        description: "Exclusive NFT for Cardano Delegaters",
+        description: "This is a commemorative NFT for delegators.",
       },
     },
-    version: "1.0",
-  },
-};
+  };
 
-// トランザクション作成・署名・送信
-const tx = await lucid
-  .newTx()
-  .attachMintingPolicy(policy)
-  .mintAssets({ [unit]: 1n })
-  .attachMetadata(721, metadata)
-  .payToAddress(toAddress, { [unit]: 1n })
-  .complete();
+  const tx = await lucid
+    .newTx()
+    .attachMintingPolicy(policy)
+    .mintAssets({ [unit]: 1n })
+    .attachMetadata(721, metadata)
+    .payToAddress(toAddress, { [unit]: 1n })
+    .complete();
 
-const signedTx = await tx.sign().complete();
-const txHash = await signedTx.submit();
+  const signedTx = await tx.sign().complete();
+  const txHash = await signedTx.submit();
 
-console.log("NFT発行成功！ Tx Hash:", txHash);
+  console.log("? Minted to:", toAddress, "Tx:", txHash);
+  return txHash;
+}
