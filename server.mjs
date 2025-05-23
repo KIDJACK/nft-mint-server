@@ -1,37 +1,4 @@
 import express from "express";
-import { config } from "dotenv";
-import { mintNFT } from "./mint-nft.mjs";
-
-config();
-const app = express();
-app.use(express.json());
-
-app.post("/mint", async (req, res) => {
-  const { address } = req.body;
-
-  if (!address || !address.startsWith("addr_test")) {
-    return res.status(400).send({ error: "Invalid or missing address" });
-  }
-
-  try {
-    const txHash = await mintNFT(address);
-    res.send({ success: true, txHash });
-  } catch (err) {
-    console.error(err);
-    res.status(500).send({ success: false, error: "Minting failed" });
-  }
-});
-
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`?? NFT Mint API listening on port ${PORT}`);
-});
-
-
-
-
-
-import express from "express";
 import dotenv from "dotenv";
 import cors from "cors";
 import { exec } from "child_process";
